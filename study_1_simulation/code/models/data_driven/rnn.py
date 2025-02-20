@@ -9,23 +9,27 @@ from torch.utils.data import Dataset , DataLoader
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-INPUT_SIZE = 5
-OUTPUT_SIZE = 2 
+INPUT_SIZE = 4
+OUTPUT_SIZE = 3 
 
 class behavior_dataset(Dataset):
     def __init__(self,data):
         
         length = len(data)
-        
+        num_actions = 3
+
         # action 
         action = np.array(data['action_stage_1'])
-        if np.all(action == action[0]):
-            action = np.append(action,(1-action[0]))
-            action = torch.tensor((action).reshape(length+1),dtype=int)
-            # one hot encoding 
-            action_onehot = nn.functional.one_hot(action,len(action.unique()))
-            # delete last one
-            action_onehot = action_onehot[:-1]
+        unique_actions = np.unique(action)
+
+        if len(unique_actions) < num_actions:
+            missing_actions = list(set(range(num_actions)) - set(unique_actions))
+            action = np.append(action, missing_actions)
+            action = torch.tensor(action.reshape(length + len(missing_actions)), dtype=int)
+            # one hot encoding
+            action_onehot = nn.functional.one_hot(action, num_classes=num_actions)
+            action_onehot = action_onehot[:-len(missing_actions)]
+
         else:
             # action 
             action = torch.tensor((action).reshape(length),dtype=int)
@@ -41,18 +45,8 @@ class behavior_dataset(Dataset):
         # adding dummy zeros to the beginning and ignoring the last one
         # [r (t-1) , a (t-1)]
         reward_action_shift = nn.functional.pad(reward_action,[0,0,1,0])[:-1]
-
-        # state 2
-        state = torch.tensor((np.array(data['state_of_stage_2'])).reshape(length),dtype=int)
-        # one hot encoding 
-        state_onehot = nn.functional.one_hot(state,len(state.unique()))
-        state_onehot_shift = nn.functional.pad(state_onehot,[0,0,1,0])[:-1]
-        
-        # [r (t-1) , a (t-1) , s (t-1)]
-        reward_action_state = torch.cat([reward_action_shift, state_onehot_shift],1)
-
-    
-        X = reward_action_state
+            
+        X = reward_action_shift
         y = action_onehot
 
         self.x = X.type(dtype=torch.float32)
