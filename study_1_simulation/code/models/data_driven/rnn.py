@@ -75,7 +75,9 @@ class GRU_NN(nn.Module):
         return output, hn
 
 def train_model(net, train_loader, val_loader , test_loader, epochs, lr):
-        
+    # Store network states for each epoch
+    network_states_per_epoch = []
+
     train_loss, train_ll = np.zeros(epochs), np.zeros(epochs)
     val_loss ,val_ll = np.zeros(epochs), np.zeros(epochs)
     test_loss, test_ll = np.zeros(epochs), np.zeros(epochs)
@@ -88,7 +90,12 @@ def train_model(net, train_loader, val_loader , test_loader, epochs, lr):
     
     # Loop over epochs
     for i in range(epochs):
-        
+        current_network_state = {
+            name: param.clone() 
+            for name, param in net.named_parameters()
+        }
+        network_states_per_epoch.append(current_network_state)
+
         # Loop over training batches
         running_loss_tr = []
         for j,(X_train,y_train) in enumerate(train_loader):
@@ -113,7 +120,7 @@ def train_model(net, train_loader, val_loader , test_loader, epochs, lr):
         
         net.train()
 
-    return net, train_loss , train_ll , val_loss, val_ll, test_loss, test_ll
+    return net, train_loss , train_ll , val_loss, val_ll, test_loss, test_ll, current_network_state
 
 def eval_net(net,val_loader):
     criterion = nn.BCELoss()
@@ -138,4 +145,31 @@ def eval_net(net,val_loader):
             ll = float(ll.to('cpu').detach())
             
     return np.array(running_loss_te).mean(), ll
+
+def compute_weight_changes_between_states(network_state_t, network_state_t_plus_1):
+    """
+    Calculate weight changes between two consecutive network states.
+    
+    Args:
+        network_state_t: Network state at time t
+        network_state_t_plus_1: Network state at time t+1
         
+    Returns:
+        numpy.ndarray: Matrix where each row represents flattened weight changes
+    """
+    weight_changes_list = []
+    
+    # Iterate through corresponding parameters in both network states
+    for (param_name_t, param_t), (param_name_t_plus_1, param_t_plus_1) in zip(
+            network_state_t.named_parameters(), 
+            network_state_t_plus_1.named_parameters()):
+            
+        # Only consider weight matrices, not biases
+        if 'weight' in param_name_t:
+            # Calculate weight difference and convert to numpy
+            weight_difference = (param_t_plus_1 - param_t).cpu().detach().numpy()
+            # Flatten the weight difference matrix into a vector
+            weight_changes_list.append(weight_difference.reshape(-1))
+            
+    # Stack vectors vertically to create weight changes matrix
+    return np.vstack(weight_changes_list).T        
