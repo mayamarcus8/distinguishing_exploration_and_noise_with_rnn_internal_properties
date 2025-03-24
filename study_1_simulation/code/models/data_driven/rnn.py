@@ -10,7 +10,7 @@ from torch.utils.data import Dataset , DataLoader
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 INPUT_SIZE = 4
-OUTPUT_SIZE = 3 
+OUTPUT_SIZE = 3
 
 class behavior_dataset(Dataset):
     def __init__(self,data):
@@ -19,7 +19,7 @@ class behavior_dataset(Dataset):
         num_actions = 3
 
         # action 
-        action = np.array(data['action_stage_1'])
+        action = np.array(data['card_selected']) - 1
         unique_actions = np.unique(action)
 
         if len(unique_actions) < num_actions:
@@ -50,7 +50,7 @@ class behavior_dataset(Dataset):
         y = action_onehot
 
         self.x = X.type(dtype=torch.float32)
-        self.y = action_onehot.type(dtype=torch.float32)
+        self.y = y.type(dtype=torch.float32)
         
         self.len = length
 
@@ -83,7 +83,7 @@ def train_model(net, train_loader, val_loader , test_loader, epochs, lr):
     # move net to GPU
     net.to(device)
     # Use Adam optimizer
-    optimizer = optim.Adam(net.parameters(), lr=lr) 
+    optimizer = optim.Adam(net.parameters(), lr=lr)
     criterion = nn.BCELoss()
     
     # Loop over epochs
